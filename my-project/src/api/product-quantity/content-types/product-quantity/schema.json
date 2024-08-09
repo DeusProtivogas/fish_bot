@@ -1,0 +1,30 @@
+{
+  "kind": "collectionType",
+  "collectionName": "product_quantities",
+  "info": {
+    "singularName": "product-quantity",
+    "pluralName": "product-quantities",
+    "displayName": "product quantity"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "product": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::product.product",
+      "inversedBy": "product_quantities"
+    },
+    "Quantity": {
+      "type": "float"
+    },
+    "cart": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::cart.cart",
+      "inversedBy": "product_quantities"
+    }
+  }
+}
