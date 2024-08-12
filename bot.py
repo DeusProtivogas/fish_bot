@@ -5,7 +5,6 @@ redis==3.2.1
 """
 import os
 import requests
-import logging
 import redis
 from dotenv import load_dotenv
 
@@ -15,114 +14,16 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Filters, Updater, CallbackContext
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
+from strapi_requests import get_products, create_cart, create_product_quantity, add_product_to_cart, get_cart, \
+    get_product, remove_item_from_cart, save_email
+
 _database = None
-
-
-def get_products():
-    headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
-    # url = f'https://<YOUR_DOMAIN>/api/<YOUR_CT>'
-    r = requests.get(f'http://{os.getenv("STRAPI_DOMAIN")}/api/products', headers=headers)
-    return r.json()
-
-
-def get_description(id):
-    headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
-    r = requests.get(f'http://{os.getenv("STRAPI_DOMAIN")}/api/products/{id}', headers=headers)
-    return r.json().get('data').get('attributes').get('Description')
-
-
-def create_cart(user_id):
-    # url_template = 'http://localhost:1337/api/restaurants'
-    headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
-    r = requests.post(
-        f'http://{os.getenv("STRAPI_DOMAIN")}/api/carts',
-        headers=headers,
-        json={
-            'data': {
-                "User": str(user_id),
-            }
-        },
-    )
-    return r.json()
-
-
-def create_product_quantity(prod_id, quant):
-    headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
-    r = requests.post(
-        f'http://{os.getenv("STRAPI_DOMAIN")}/api/product-quantities',
-        headers=headers,
-        json={
-            'data': {
-                "Quantity": str(quant),
-                "product": [prod_id],
-            }
-        },
-    )
-    return r.json()
-
-
-def add_product_to_cart(cart_id, prod_quant_id):
-    headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
-    r = requests.put(
-        f'http://{os.getenv("STRAPI_DOMAIN")}/api/carts/{int(cart_id)}',
-        headers=headers,
-        json={
-            'data': {
-                "product_quantities": {
-                    'connect': [prod_quant_id],
-                }
-            }
-        },
-    )
-    return r.json()
-
-
-def get_cart(user_id):
-    headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
-    r = requests.get(
-        f'http://{os.getenv("STRAPI_DOMAIN")}/api/carts',
-        headers=headers,
-        params={
-            'filters[User][$eq]': str(user_id),
-            'populate[product_quantities][populate][0]': 'product',
-        }
-    )
-    return r.json()
-
-
-def get_product(id):
-    headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
-    r = requests.get(f'http://{os.getenv("STRAPI_DOMAIN")}/api/products/{id}?populate=Picture', headers=headers)
-    return r.json().get('data')
-
-
-def remove_item_from_cart(item_id):
-    headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
-    r = requests.delete(
-        f'http://{os.getenv("STRAPI_DOMAIN")}/api/product-quantities/{item_id}',
-        headers=headers
-    )
-
-
-def save_email(user_id, email):
-    headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
-    r = requests.post(
-        f'http://{os.getenv("STRAPI_DOMAIN")}/api/clients',
-        headers=headers,
-        json={
-            'data': {
-                "tg_id": str(user_id),
-                "Email": email,
-            }
-        },
-    )
-    print("TESTING EMAIL: ", r.json())
 
 
 def start(update: Update, context: CallbackContext) -> None:
     """Sends a message with three inline buttons attached."""
     context.user_data['state'] = 'BUTTONS'
-    products = get_products()
+    products = get_products(context.user_data['domain'])
 
     keyboard =[
         [InlineKeyboardButton("Показать корзину", callback_data='/cart')],
@@ -151,7 +52,7 @@ def start(update: Update, context: CallbackContext) -> None:
 def button(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
 
-    product = get_product(query.data.split('_')[1])
+    product = get_product(query.data.split('_')[1], context.user_data['domain'])
     descr = product.get('attributes').get('Description')
     image = product.get('attributes').get('Picture').get('data')[0].get('attributes').get('formats').get('small').get('url')
 
@@ -171,7 +72,7 @@ def button(update: Update, context: CallbackContext) -> None:
     query.bot.send_photo(
         chat_id=context.user_data['chat_id'],
         caption=descr,
-        photo=BytesIO(requests.get(f'http://{os.getenv("STRAPI_DOMAIN")}/{image}').content),
+        photo=BytesIO(requests.get(f'http://{context.user_data["domain"]}/{image}').content),
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
@@ -198,7 +99,7 @@ def handle_email(update: Update, context: CallbackContext):
 
     context.user_data['email'] = update.message.text
 
-    save_email(update.message.chat_id, context.user_data['email'])
+    save_email(update.message.chat_id, context.user_data['email'], context.user_data['domain'])
 
     keyboard = [
         [InlineKeyboardButton("В меню", callback_data='/back')],
@@ -219,14 +120,15 @@ def add_to_cart(update: Update, context: CallbackContext) -> None:
     ans = create_product_quantity(
         context.user_data['product_id'],
         update.message.text,
+        context.user_data['domain'],
     )
     p_q_id = ans.get('data').get('id')
 
-    cart = get_cart(update.message.chat_id)
+    cart = get_cart(update.message.chat_id, context.user_data['domain'])
     if not cart.get('data'):
-        ans = create_cart(update.message.chat_id)
+        ans = create_cart(update.message.chat_id, context.user_data['domain'])
     c_id = cart.get('data')[0].get('id')
-    add_product_to_cart(c_id, p_q_id)
+    add_product_to_cart(c_id, p_q_id, context.user_data['domain'])
 
     keyboard = [
         [InlineKeyboardButton("В меню", callback_data='/back')],
@@ -241,7 +143,7 @@ def add_to_cart(update: Update, context: CallbackContext) -> None:
 
 def show_cart(update: Update, context: CallbackContext):
     chat_id = context.user_data['chat_id']
-    cart = get_cart(chat_id)
+    cart = get_cart(chat_id, context.user_data['domain'])
 
     context.user_data['state'] = 'START'
 
@@ -294,6 +196,7 @@ def handle_users_reply(update, context):
     else:
         return
     context.user_data['chat_id'] = chat_id
+    context.user_data['domain'] = os.getenv("STRAPI_DOMAIN")
 
     if user_reply == '/start':
         # user_state = 'START'
@@ -301,7 +204,7 @@ def handle_users_reply(update, context):
     elif user_reply == '/cart':
         context.user_data['state'] = 'CART'
     elif user_reply.startswith('/remove'):
-        remove_item_from_cart(user_reply.split('_')[1])
+        remove_item_from_cart(user_reply.split('_')[1], context.user_data['domain'])
         context.user_data['state'] = 'CART'
     elif user_reply == '/pay':
         context.user_data['state'] = 'PAYMENT'
