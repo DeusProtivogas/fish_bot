@@ -5,19 +5,19 @@ import requests
 
 def get_products(domain):
     headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
-    # url = f'https://<YOUR_DOMAIN>/api/<YOUR_CT>'
     r = requests.get(f'http://{domain}/api/products', headers=headers)
+    r.raise_for_status()
     return r.json()
 
 
 def get_description(id, domain):
     headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
     r = requests.get(f'http://{domain}/api/products/{id}', headers=headers)
+    r.raise_for_status()
     return r.json().get('data').get('attributes').get('Description')
 
 
 def create_cart(user_id, domain):
-    # url_template = 'http://localhost:1337/api/restaurants'
     headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
     r = requests.post(
         f'http://{domain}/api/carts',
@@ -28,6 +28,7 @@ def create_cart(user_id, domain):
             }
         },
     )
+    r.raise_for_status()
     return r.json()
 
 
@@ -43,6 +44,7 @@ def create_product_quantity(prod_id, quant, domain):
             }
         },
     )
+    r.raise_for_status()
     return r.json()
 
 
@@ -59,6 +61,7 @@ def add_product_to_cart(cart_id, prod_quant_id, domain):
             }
         },
     )
+    r.raise_for_status()
     return r.json()
 
 
@@ -72,12 +75,14 @@ def get_cart(user_id, domain):
             'populate[product_quantities][populate][0]': 'product',
         }
     )
+    r.raise_for_status()
     return r.json()
 
 
 def get_product(id, domain):
     headers = {"Authorization": f"Bearer {os.getenv('STRAPI_TOKEN')}"}
     r = requests.get(f'http://{domain}/api/products/{id}?populate=Picture', headers=headers)
+    r.raise_for_status()
     return r.json().get('data')
 
 
@@ -87,6 +92,7 @@ def remove_item_from_cart(item_id, domain):
         f'http://{domain}/api/product-quantities/{item_id}',
         headers=headers
     )
+    r.raise_for_status()
 
 
 def save_email(user_id, email, domain):
@@ -101,4 +107,5 @@ def save_email(user_id, email, domain):
             }
         },
     )
+    r.raise_for_status()
     print("TESTING EMAIL: ", r.json())

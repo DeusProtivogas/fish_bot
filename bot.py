@@ -472,7 +472,6 @@ def show_cart(update: Update, context: CallbackContext):
     )
 
 
-
 def handle_users_reply(update, context):
     """
     Функция, которая запускается при любом сообщении от пользователя и решает как его обработать.
@@ -499,26 +498,8 @@ def handle_users_reply(update, context):
     context.user_data['domain'] = os.getenv("STRAPI_DOMAIN")
 
     if user_reply == '/start':
-        # user_state = 'START'
         context.user_data['state'] = 'START'
-    # elif user_reply == '/cart':
-    #     context.user_data['state'] = 'CART'
-    # elif user_reply.startswith('/remove'):
-    #     remove_item_from_cart(user_reply.split('_')[1], context.user_data['domain'])
-    #     context.user_data['state'] = 'CART'
-    # elif user_reply == '/pay':
-    #     context.user_data['state'] = 'PAYMENT'
-    # elif user_reply == '/back':
-    #     context.user_data['state'] = 'START'
-    # elif user_reply.startswith('/show'):
-    #     context.user_data['state'] = 'BUTTONS'
-    # elif user_reply == '/add':
-    #     # add_to_cart(update, context)
-    #     context.user_data['state'] = 'QUANTITY'
-    #     # add_to_cart(update, context)
     else:
-        # pass
-        # user_state = 'BUTTONS'
         context.user_data['state'] = db.get(chat_id).decode("utf-8")
 
     states_functions = {
@@ -528,20 +509,14 @@ def handle_users_reply(update, context):
         'HANDLE_GOOD': handle_good,
         'HANDLE_EMAIL': handle_email,
         'HANDLE_DESCRIPTION': handle_description,
-
-        # 'BUTTONS': button,
-        # 'ADD': add_to_cart,
-        # 'QUANTITY': ask_quantity,
-        # 'CART': show_cart,
-        # 'PAYMENT': ask_email,
-        # 'HANDLE_EMAIL': handle_email,
     }
 
-    state_handler = states_functions[context.user_data['state']]
-    # abs = state_handler(update, context)
-    # print(abs)
-    next_state = state_handler(update, context)
-    db.set(chat_id, next_state)
+    try:
+        state_handler = states_functions[context.user_data['state']]
+        next_state = state_handler(update, context)
+        db.set(chat_id, next_state)
+    except requests.exceptions.HTTPError as e:
+        print(e)
 
 
 def get_database_connection():
