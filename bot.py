@@ -25,7 +25,7 @@ def start(update: Update, context: CallbackContext):
     # context.user_data['state'] = 'BUTTONS'
     products = get_products(context.user_data['domain'])
 
-    keyboard =[
+    keyboard = [
         [InlineKeyboardButton("Показать корзину", callback_data='/cart')],
     ]
 
@@ -349,51 +349,6 @@ def handle_good(update: Update, context: CallbackContext):
         return 'HANDLE_DESCRIPTION'
 
 
-def button(update: Update, context: CallbackContext) -> None:
-    query = update.callback_query
-
-    product = get_product(query.data.split('_')[1], context.user_data['domain'])
-    descr = product.get('attributes').get('Description')
-    image = product.get('attributes').get('Picture').get('data')[0].get('attributes').get('formats').get('small').get('url')
-
-    query.bot.delete_message(
-        chat_id=context.user_data['chat_id'],
-        message_id=update.callback_query.message.message_id,
-    )
-
-    context.user_data['product_id'] = product.get('id')
-
-    keyboard = [
-        [InlineKeyboardButton("Добавить в корзину", callback_data='/add')],
-        [InlineKeyboardButton("Показать корзину", callback_data='/cart')],
-        [InlineKeyboardButton("Назад", callback_data='/back')],
-    ]
-
-    query.bot.send_photo(
-        chat_id=context.user_data['chat_id'],
-        caption=descr,
-        photo=BytesIO(requests.get(f'http://{context.user_data["domain"]}/{image}').content),
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
-
-
-def ask_quantity(update: Update, context: CallbackContext) -> None:
-    context.user_data['state'] = 'ADD'
-
-    query = update.callback_query
-
-    context.bot.send_message(
-        chat_id=context.user_data['chat_id'],
-        text='Введите количество (в кг):',
-    )
-
-def ask_email(update: Update, context: CallbackContext) -> None:
-    context.user_data['state'] = 'HANDLE_EMAIL'
-    context.bot.send_message(
-        chat_id=context.user_data['chat_id'],
-        text='Введите свою почту, чтобы с Вами связался продавец:',
-    )
-
 def handle_email(update: Update, context: CallbackContext):
     context.user_data['state'] = 'START'
 
@@ -408,66 +363,6 @@ def handle_email(update: Update, context: CallbackContext):
     context.bot.send_message(
         chat_id=context.user_data['chat_id'],
         text='Спасибо! С Вами скоро свяжутся!',
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
-
-
-def add_to_cart(update: Update, context: CallbackContext) -> None:
-    context.user_data['state'] = 'START'
-
-    query = update.callback_query
-
-    ans = create_product_quantity(
-        context.user_data['product_id'],
-        update.message.text,
-        context.user_data['domain'],
-    )
-    p_q_id = ans.get('data').get('id')
-
-    cart = get_cart(update.message.chat_id, context.user_data['domain'])
-    if not cart.get('data'):
-        ans = create_cart(update.message.chat_id, context.user_data['domain'])
-    c_id = cart.get('data')[0].get('id')
-    add_product_to_cart(c_id, p_q_id, context.user_data['domain'])
-
-    keyboard = [
-        [InlineKeyboardButton("В меню", callback_data='/back')],
-    ]
-
-    context.bot.send_message(
-        chat_id=context.user_data['chat_id'],
-        text="Товар добавлен в корзину!",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
-
-
-def show_cart(update: Update, context: CallbackContext):
-    chat_id = context.user_data['chat_id']
-    cart = get_cart(chat_id, context.user_data['domain'])
-
-    context.user_data['state'] = 'START'
-
-    p_q_pairs = cart.get('data')[0].get('attributes').get('product_quantities').get('data')
-
-    cart_text = [
-        f'{item.get("attributes").get("product").get("data").get("attributes").get("Name")}: {item.get("attributes").get("Quantity")} кг' for item in p_q_pairs
-    ]
-
-    keyboard = [
-        [InlineKeyboardButton("В меню", callback_data='/back')],
-        [InlineKeyboardButton("Заказать", callback_data='/pay')],
-    ]
-
-    keyboard += [
-        [InlineKeyboardButton(
-            f'Отказаться от {item.get("attributes").get("product").get("data").get("attributes").get("Name")}: {item.get("attributes").get("Quantity")} кг',
-            callback_data=f'/remove_{item.get("id")}',
-        )] for item in p_q_pairs
-    ]
-
-    context.bot.send_message(
-        chat_id=context.user_data['chat_id'],
-        text='\n'.join(cart_text),
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
@@ -539,8 +434,6 @@ if __name__ == '__main__':
     updater = Updater(token)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
-
-    dispatcher.add_handler(CallbackQueryHandler(button))
 
     dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
