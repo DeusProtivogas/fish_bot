@@ -20,7 +20,37 @@ from strapi_requests import get_products, create_cart, create_product_quantity, 
 _database = None
 
 
-def start(update: Update, context: CallbackContext) -> None:
+def start(update: Update, context: CallbackContext):
+    """Sends a message with three inline buttons attached."""
+    # context.user_data['state'] = 'BUTTONS'
+    products = get_products(context.user_data['domain'])
+
+    keyboard =[
+        [InlineKeyboardButton("Показать корзину", callback_data='/cart')],
+    ]
+
+    keyboard += [
+        [
+            InlineKeyboardButton(
+                product.get('attributes').get('Name'),
+                callback_data=f'/show_{product.get("id")}'
+            )
+        ] for product in products.get('data')
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    context.bot.send_message(
+        chat_id=context.user_data['chat_id'],
+        text='Выберите:',
+        reply_markup=reply_markup,
+    )
+    print("HELLO")
+    # update.message.reply_text('Please choose:', reply_markup=reply_markup)
+    return 'HANDLE_MENU'
+
+
+def handle_description(update: Update, context: CallbackContext):
     """Sends a message with three inline buttons attached."""
     context.user_data['state'] = 'BUTTONS'
     products = get_products(context.user_data['domain'])
@@ -45,8 +75,278 @@ def start(update: Update, context: CallbackContext) -> None:
         text='Выберите:',
         reply_markup=reply_markup,
     )
-
+    print("H DESCR")
     # update.message.reply_text('Please choose:', reply_markup=reply_markup)
+    return 'HANDLE_MENU'
+
+
+def handle_menu(update: Update, context: CallbackContext):
+    query = update.callback_query
+
+    if query.data == '/cart':
+        chat_id = context.user_data['chat_id']
+        cart = get_cart(chat_id, context.user_data['domain'])
+
+        context.user_data['state'] = 'START'
+
+        p_q_pairs = cart.get('data')[0].get('attributes').get('product_quantities').get('data')
+
+        cart_text = [
+            f'{item.get("attributes").get("product").get("data").get("attributes").get("Name")}: {item.get("attributes").get("Quantity")} кг'
+            for item in p_q_pairs
+        ]
+
+        keyboard = [
+            [InlineKeyboardButton("В меню", callback_data='/back')],
+            [InlineKeyboardButton("Заказать", callback_data='/pay')],
+        ]
+
+        keyboard += [
+            [InlineKeyboardButton(
+                f'Отказаться от {item.get("attributes").get("product").get("data").get("attributes").get("Name")}: {item.get("attributes").get("Quantity")} кг',
+                callback_data=f'/remove_{item.get("id")}',
+            )] for item in p_q_pairs
+        ]
+
+        context.bot.send_message(
+            chat_id=context.user_data['chat_id'],
+            text='\n'.join(cart_text),
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return 'HANDLE_CART'
+
+    elif query.data.startswith('/show'):
+        product = get_product(query.data.split('_')[1], context.user_data['domain'])
+        descr = product.get('attributes').get('Description')
+        image = product.get('attributes').get('Picture').get('data')[0].get('attributes').get('formats').get(
+            'small').get('url')
+
+        query.bot.delete_message(
+            chat_id=context.user_data['chat_id'],
+            message_id=update.callback_query.message.message_id,
+        )
+
+        context.user_data['product_id'] = product.get('id')
+
+        keyboard = [
+            [InlineKeyboardButton("Добавить в корзину", callback_data='/add')],
+            [InlineKeyboardButton("Показать корзину", callback_data='/cart')],
+            [InlineKeyboardButton("Назад", callback_data='/back')],
+        ]
+
+        query.bot.send_photo(
+            chat_id=context.user_data['chat_id'],
+            caption=descr,
+            photo=BytesIO(requests.get(f'http://{context.user_data["domain"]}/{image}').content),
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return 'HANDLE_GOOD'
+    else:
+        return
+
+
+def handle_cart(update: Update, context: CallbackContext):
+    query = update.callback_query
+
+    if query.data.startswith('/remove'):
+        remove_item_from_cart(query.data.split('_')[1], context.user_data['domain'])
+        chat_id = context.user_data['chat_id']
+        cart = get_cart(chat_id, context.user_data['domain'])
+
+        # context.user_data['state'] = 'START'
+
+        p_q_pairs = cart.get('data')[0].get('attributes').get('product_quantities').get('data')
+
+        cart_text = [
+            f'{item.get("attributes").get("product").get("data").get("attributes").get("Name")}: {item.get("attributes").get("Quantity")} кг'
+            for item in p_q_pairs
+        ]
+
+        keyboard = [
+            [InlineKeyboardButton("В меню", callback_data='/back')],
+            [InlineKeyboardButton("Заказать", callback_data='/pay')],
+        ]
+
+        keyboard += [
+            [InlineKeyboardButton(
+                f'Отказаться от {item.get("attributes").get("product").get("data").get("attributes").get("Name")}: {item.get("attributes").get("Quantity")} кг',
+                callback_data=f'/remove_{item.get("id")}',
+            )] for item in p_q_pairs
+        ]
+
+        context.bot.send_message(
+            chat_id=context.user_data['chat_id'],
+            text='\n'.join(cart_text),
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return 'HANDLE_CART'
+
+    elif query.data == '/back':
+        """Sends a message with three inline buttons attached."""
+        # context.user_data['state'] = 'BUTTONS'
+        products = get_products(context.user_data['domain'])
+
+        keyboard = [
+            [InlineKeyboardButton("Показать корзину", callback_data='/cart')],
+        ]
+
+        keyboard += [
+            [
+                InlineKeyboardButton(
+                    product.get('attributes').get('Name'),
+                    callback_data=f'/show_{product.get("id")}'
+                )
+            ] for product in products.get('data')
+        ]
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        context.bot.send_message(
+            chat_id=context.user_data['chat_id'],
+            text='Выберите:',
+            reply_markup=reply_markup,
+        )
+        print("H DESCR")
+        # update.message.reply_text('Please choose:', reply_markup=reply_markup)
+        return 'HANDLE_MENU'
+        # return 'HANDLE_DESCRIPTION'
+
+    elif query.data == '/pay':
+        context.bot.send_message(
+            chat_id=context.user_data[f'chat_id'],
+            text='Введите свою почту, чтобы с Вами связался продавец:',
+        )
+        return 'HANDLE_EMAIL'
+
+
+def handle_email(update: Update, context: CallbackContext):
+    # query = update.callback_query
+    context.user_data['email'] = update.message.text
+
+    save_email(update.message.chat_id, context.user_data['email'], context.user_data['domain'])
+
+    keyboard = [
+        [InlineKeyboardButton("В меню", callback_data='/back')],
+    ]
+
+    context.bot.send_message(
+        chat_id=context.user_data['chat_id'],
+        text='Спасибо! С Вами скоро свяжутся!',
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+def handle_good(update: Update, context: CallbackContext):
+    query = update.callback_query
+
+    user_reply = None
+
+    if update.message:
+        user_reply = update.message.text
+        chat_id = update.message.chat_id
+    elif update.callback_query:
+        user_reply = update.callback_query.data
+        chat_id = update.callback_query.message.chat_id
+
+    if user_reply.startswith('/cart'):
+        chat_id = context.user_data['chat_id']
+        cart = get_cart(chat_id, context.user_data['domain'])
+
+        context.user_data['state'] = 'START'
+
+        p_q_pairs = cart.get('data')[0].get('attributes').get('product_quantities').get('data')
+
+        cart_text = [
+            f'{item.get("attributes").get("product").get("data").get("attributes").get("Name")}: {item.get("attributes").get("Quantity")} кг'
+            for item in p_q_pairs
+        ]
+
+        keyboard = [
+            [InlineKeyboardButton("В меню", callback_data='/back')],
+            [InlineKeyboardButton("Заказать", callback_data='/pay')],
+        ]
+
+        keyboard += [
+            [InlineKeyboardButton(
+                f'Отказаться от {item.get("attributes").get("product").get("data").get("attributes").get("Name")}: {item.get("attributes").get("Quantity")} кг',
+                callback_data=f'/remove_{item.get("id")}',
+            )] for item in p_q_pairs
+        ]
+
+        context.bot.send_message(
+            chat_id=context.user_data['chat_id'],
+            text='\n'.join(cart_text),
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return 'HANDLE_CART'
+
+    elif user_reply == '/back':
+        """Sends a message with three inline buttons attached."""
+        context.user_data['state'] = 'BUTTONS'
+        products = get_products(context.user_data['domain'])
+
+        keyboard = [
+            [InlineKeyboardButton("Показать корзину", callback_data='/cart')],
+        ]
+
+        keyboard += [
+            [
+                InlineKeyboardButton(
+                    product.get('attributes').get('Name'),
+                    callback_data=f'/show_{product.get("id")}'
+                )
+            ] for product in products.get('data')
+        ]
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        context.bot.send_message(
+            chat_id=context.user_data['chat_id'],
+            text='Выберите:',
+            reply_markup=reply_markup,
+        )
+        print("H DESCR")
+        # update.message.reply_text('Please choose:', reply_markup=reply_markup)
+        return 'HANDLE_MENU'
+        # return 'HANDLE_DESCRIPTION'
+
+    elif user_reply == '/add':
+        context.bot.send_message(
+            chat_id=context.user_data['chat_id'],
+            text='Введите количество (в кг):',
+        )
+        return 'HANDLE_GOOD'
+
+    else:
+        try:
+            mass = float(user_reply)
+        except ValueError:
+            print("Not a float")
+        # query = update.callback_query
+
+        ans = create_product_quantity(
+            context.user_data['product_id'],
+            mass,
+            context.user_data['domain'],
+        )
+        p_q_id = ans.get('data').get('id')
+
+        cart = get_cart(update.message.chat_id, context.user_data['domain'])
+        if not cart.get('data'):
+            ans = create_cart(update.message.chat_id, context.user_data['domain'])
+        c_id = cart.get('data')[0].get('id')
+        add_product_to_cart(c_id, p_q_id, context.user_data['domain'])
+
+        keyboard = [
+            [InlineKeyboardButton("В меню", callback_data='/back')],
+        ]
+
+        context.bot.send_message(
+            chat_id=context.user_data['chat_id'],
+            text="Товар добавлен в корзину!",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return 'HANDLE_DESCRIPTION'
 
 
 def button(update: Update, context: CallbackContext) -> None:
@@ -201,21 +501,21 @@ def handle_users_reply(update, context):
     if user_reply == '/start':
         # user_state = 'START'
         context.user_data['state'] = 'START'
-    elif user_reply == '/cart':
-        context.user_data['state'] = 'CART'
-    elif user_reply.startswith('/remove'):
-        remove_item_from_cart(user_reply.split('_')[1], context.user_data['domain'])
-        context.user_data['state'] = 'CART'
-    elif user_reply == '/pay':
-        context.user_data['state'] = 'PAYMENT'
-    elif user_reply == '/back':
-        context.user_data['state'] = 'START'
-    elif user_reply.startswith('/show'):
-        context.user_data['state'] = 'BUTTONS'
-    elif user_reply == '/add':
-        # add_to_cart(update, context)
-        context.user_data['state'] = 'QUANTITY'
-        # add_to_cart(update, context)
+    # elif user_reply == '/cart':
+    #     context.user_data['state'] = 'CART'
+    # elif user_reply.startswith('/remove'):
+    #     remove_item_from_cart(user_reply.split('_')[1], context.user_data['domain'])
+    #     context.user_data['state'] = 'CART'
+    # elif user_reply == '/pay':
+    #     context.user_data['state'] = 'PAYMENT'
+    # elif user_reply == '/back':
+    #     context.user_data['state'] = 'START'
+    # elif user_reply.startswith('/show'):
+    #     context.user_data['state'] = 'BUTTONS'
+    # elif user_reply == '/add':
+    #     # add_to_cart(update, context)
+    #     context.user_data['state'] = 'QUANTITY'
+    #     # add_to_cart(update, context)
     else:
         # pass
         # user_state = 'BUTTONS'
@@ -223,17 +523,24 @@ def handle_users_reply(update, context):
 
     states_functions = {
         'START': start,
-        'BUTTONS': button,
-        'ADD': add_to_cart,
-        'QUANTITY': ask_quantity,
-        'CART': show_cart,
-        'PAYMENT': ask_email,
+        'HANDLE_MENU': handle_menu,
+        'HANDLE_CART': handle_cart,
+        'HANDLE_GOOD': handle_good,
         'HANDLE_EMAIL': handle_email,
+        'HANDLE_DESCRIPTION': handle_description,
+
+        # 'BUTTONS': button,
+        # 'ADD': add_to_cart,
+        # 'QUANTITY': ask_quantity,
+        # 'CART': show_cart,
+        # 'PAYMENT': ask_email,
+        # 'HANDLE_EMAIL': handle_email,
     }
 
     state_handler = states_functions[context.user_data['state']]
-    state_handler(update, context)
-    next_state = context.user_data['state']
+    # abs = state_handler(update, context)
+    # print(abs)
+    next_state = state_handler(update, context)
     db.set(chat_id, next_state)
 
 
