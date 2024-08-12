@@ -22,7 +22,6 @@ _database = None
 
 def start(update: Update, context: CallbackContext):
     """Sends a message with three inline buttons attached."""
-    # context.user_data['state'] = 'BUTTONS'
     products = get_products(context.user_data['domain'])
 
     keyboard = [
@@ -45,8 +44,6 @@ def start(update: Update, context: CallbackContext):
         text='Выберите:',
         reply_markup=reply_markup,
     )
-    print("HELLO")
-    # update.message.reply_text('Please choose:', reply_markup=reply_markup)
     return 'HANDLE_MENU'
 
 
@@ -75,8 +72,6 @@ def handle_description(update: Update, context: CallbackContext):
         text='Выберите:',
         reply_markup=reply_markup,
     )
-    print("H DESCR")
-    # update.message.reply_text('Please choose:', reply_markup=reply_markup)
     return 'HANDLE_MENU'
 
 
@@ -153,8 +148,6 @@ def handle_cart(update: Update, context: CallbackContext):
         chat_id = context.user_data['chat_id']
         cart = get_cart(chat_id, context.user_data['domain'])
 
-        # context.user_data['state'] = 'START'
-
         p_q_pairs = cart.get('data')[0].get('attributes').get('product_quantities').get('data')
 
         cart_text = [
@@ -183,7 +176,6 @@ def handle_cart(update: Update, context: CallbackContext):
 
     elif query.data == '/back':
         """Sends a message with three inline buttons attached."""
-        # context.user_data['state'] = 'BUTTONS'
         products = get_products(context.user_data['domain'])
 
         keyboard = [
@@ -206,10 +198,7 @@ def handle_cart(update: Update, context: CallbackContext):
             text='Выберите:',
             reply_markup=reply_markup,
         )
-        print("H DESCR")
-        # update.message.reply_text('Please choose:', reply_markup=reply_markup)
         return 'HANDLE_MENU'
-        # return 'HANDLE_DESCRIPTION'
 
     elif query.data == '/pay':
         context.bot.send_message(
@@ -220,7 +209,6 @@ def handle_cart(update: Update, context: CallbackContext):
 
 
 def handle_email(update: Update, context: CallbackContext):
-    # query = update.callback_query
     context.user_data['email'] = update.message.text
 
     save_email(update.message.chat_id, context.user_data['email'], context.user_data['domain'])
@@ -305,10 +293,7 @@ def handle_good(update: Update, context: CallbackContext):
             text='Выберите:',
             reply_markup=reply_markup,
         )
-        print("H DESCR")
-        # update.message.reply_text('Please choose:', reply_markup=reply_markup)
         return 'HANDLE_MENU'
-        # return 'HANDLE_DESCRIPTION'
 
     elif user_reply == '/add':
         context.bot.send_message(
@@ -322,7 +307,6 @@ def handle_good(update: Update, context: CallbackContext):
             mass = float(user_reply)
         except ValueError:
             print("Not a float")
-        # query = update.callback_query
 
         ans = create_product_quantity(
             context.user_data['product_id'],
