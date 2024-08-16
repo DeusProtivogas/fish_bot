@@ -116,10 +116,7 @@ def handle_menu(update: Update, context: CallbackContext):
         image = product.get('attributes').get('Picture').get('data')[0].get('attributes').get('formats').get(
             'small').get('url')
 
-        query.bot.delete_message(
-            chat_id=context.user_data['chat_id'],
-            message_id=update.callback_query.message.message_id,
-        )
+        message_to_delete = update.callback_query.message.message_id
 
         context.user_data['product_id'] = product.get('id')
 
@@ -134,6 +131,11 @@ def handle_menu(update: Update, context: CallbackContext):
             caption=descr,
             photo=BytesIO(requests.get(f'http://{context.user_data["domain"]}/{image}').content),
             reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+        query.bot.delete_message(
+            chat_id=context.user_data['chat_id'],
+            message_id=message_to_delete,
         )
         return 'HANDLE_GOOD'
     else:
