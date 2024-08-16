@@ -22,7 +22,7 @@ _database = None
 
 def start(update: Update, context: CallbackContext):
     """Sends a message with three inline buttons attached."""
-    products = get_products(context.user_data['domain'])
+    products = get_products(context.user_data['domain'], context.user_data['token'])
 
     keyboard = [
         [InlineKeyboardButton("Показать корзину", callback_data='/cart')],
@@ -50,7 +50,7 @@ def start(update: Update, context: CallbackContext):
 def handle_description(update: Update, context: CallbackContext):
     """Sends a message with three inline buttons attached."""
     context.user_data['state'] = 'BUTTONS'
-    products = get_products(context.user_data['domain'])
+    products = get_products(context.user_data['domain'], context.user_data['token'])
 
     keyboard =[
         [InlineKeyboardButton("Показать корзину", callback_data='/cart')],
@@ -80,7 +80,7 @@ def handle_menu(update: Update, context: CallbackContext):
 
     if query.data == '/cart':
         chat_id = context.user_data['chat_id']
-        cart = get_cart(chat_id, context.user_data['domain'])
+        cart = get_cart(chat_id, context.user_data['domain'], context.user_data['token'])
 
         context.user_data['state'] = 'START'
 
@@ -111,7 +111,7 @@ def handle_menu(update: Update, context: CallbackContext):
         return 'HANDLE_CART'
 
     elif query.data.startswith('/show'):
-        product = get_product(query.data.split('_')[1], context.user_data['domain'])
+        product = get_product(query.data.split('_')[1], context.user_data['domain'], context.user_data['token'])
         descr = product.get('attributes').get('Description')
         image = product.get('attributes').get('Picture').get('data')[0].get('attributes').get('formats').get(
             'small').get('url')
@@ -146,9 +146,9 @@ def handle_cart(update: Update, context: CallbackContext):
     query = update.callback_query
 
     if query.data.startswith('/remove'):
-        remove_item_from_cart(query.data.split('_')[1], context.user_data['domain'])
+        remove_item_from_cart(query.data.split('_')[1], context.user_data['domain'], context.user_data['token'])
         chat_id = context.user_data['chat_id']
-        cart = get_cart(chat_id, context.user_data['domain'])
+        cart = get_cart(chat_id, context.user_data['domain'], context.user_data['token'])
 
         p_q_pairs = cart.get('data')[0].get('attributes').get('product_quantities').get('data')
 
@@ -178,7 +178,7 @@ def handle_cart(update: Update, context: CallbackContext):
 
     elif query.data == '/back':
         """Sends a message with three inline buttons attached."""
-        products = get_products(context.user_data['domain'])
+        products = get_products(context.user_data['domain'], context.user_data['token'])
 
         keyboard = [
             [InlineKeyboardButton("Показать корзину", callback_data='/cart')],
@@ -213,7 +213,12 @@ def handle_cart(update: Update, context: CallbackContext):
 def handle_email(update: Update, context: CallbackContext):
     context.user_data['email'] = update.message.text
 
-    save_email(update.message.chat_id, context.user_data['email'], context.user_data['domain'])
+    save_email(
+        update.message.chat_id,
+        context.user_data['email'],
+        context.user_data['domain'],
+        context.user_data['token']
+    )
 
     keyboard = [
         [InlineKeyboardButton("В меню", callback_data='/back')],
@@ -240,7 +245,7 @@ def handle_good(update: Update, context: CallbackContext):
 
     if user_reply.startswith('/cart'):
         chat_id = context.user_data['chat_id']
-        cart = get_cart(chat_id, context.user_data['domain'])
+        cart = get_cart(chat_id, context.user_data['domain'], context.user_data['token'])
 
         context.user_data['state'] = 'START'
 
@@ -273,7 +278,7 @@ def handle_good(update: Update, context: CallbackContext):
     elif user_reply == '/back':
         """Sends a message with three inline buttons attached."""
         context.user_data['state'] = 'BUTTONS'
-        products = get_products(context.user_data['domain'])
+        products = get_products(context.user_data['domain'], context.user_data['token'])
 
         keyboard = [
             [InlineKeyboardButton("Показать корзину", callback_data='/cart')],
@@ -314,14 +319,15 @@ def handle_good(update: Update, context: CallbackContext):
             context.user_data['product_id'],
             mass,
             context.user_data['domain'],
+            context.user_data['token'],
         )
         p_q_id = ans.get('data').get('id')
 
-        cart = get_cart(update.message.chat_id, context.user_data['domain'])
+        cart = get_cart(update.message.chat_id, context.user_data['domain'], context.user_data['token'])
         if not cart.get('data'):
-            ans = create_cart(update.message.chat_id, context.user_data['domain'])
+            ans = create_cart(update.message.chat_id, context.user_data['domain'], context.user_data['token'])
         c_id = cart.get('data')[0].get('id')
-        add_product_to_cart(c_id, p_q_id, context.user_data['domain'])
+        add_product_to_cart(c_id, p_q_id, context.user_data['domain'], context.user_data['token'])
 
         keyboard = [
             [InlineKeyboardButton("В меню", callback_data='/back')],
@@ -340,7 +346,12 @@ def handle_email(update: Update, context: CallbackContext):
 
     context.user_data['email'] = update.message.text
 
-    save_email(update.message.chat_id, context.user_data['email'], context.user_data['domain'])
+    save_email(
+        update.message.chat_id,
+        context.user_data['email'],
+        context.user_data['domain'],
+        context.user_data['token']
+    )
 
     keyboard = [
         [InlineKeyboardButton("В меню", callback_data='/back')],
@@ -377,6 +388,7 @@ def handle_users_reply(update, context):
         return
     context.user_data['chat_id'] = chat_id
     context.user_data['domain'] = os.getenv("STRAPI_DOMAIN")
+    context.user_data['token'] = os.getenv("STRAPI_TOKEN")
 
     if user_reply == '/start':
         context.user_data['state'] = 'START'
