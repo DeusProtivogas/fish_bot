@@ -4,7 +4,6 @@ import requests
 
 
 def get_products(domain, token):
-    # os.getenv('STRAPI_TOKEN')
     headers = {"Authorization": f"Bearer {token}"}
     r = requests.get(f'http://{domain}/api/products', headers=headers)
     r.raise_for_status()
